@@ -10,18 +10,19 @@ from datetime import datetime
 # This tells Python where the root directory of your project is
 basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(basedir)
+from DataProcessor.ProcessorClass import ProcessorClass
 
 from Helpers import impute_left_censored, enforce_numeric_datatype, detect_changes_between_dataframes
 from Schema.sample_schema import SampleSchema
 
 R_IMPUTED = "R_imputed.csv"
 
-class Imputation:
+class Imputation(ProcessorClass):
     """This class includes methods for imputing missing values in the dataframes."""
 
     def __init__(self):
-        self.input_path = os.path.join(os.path.dirname(__file__), 'input')
-        self.output_path = os.path.join(os.path.dirname(__file__), 'output')
+        super().__init__(__file__)
+
         self.output_copy_path_1 = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'PCA', 'input')
         self.output_copy_path_2 = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ANOVA', 'input')
 
@@ -37,10 +38,8 @@ class Imputation:
         for file_name in file_names:
             if file_name.startswith('merged_DataCleaning'):
                 impute_file = file_name
-            elif file_name.startswith('sample'):
-                sampleId_file = file_name
 
-        if impute_file and sampleId_file:
+        if impute_file:
             df = self.extract_csv(impute_file)
 
             # step 1 exclude injectionID for imputation steps
@@ -80,28 +79,8 @@ class Imputation:
             # # COMPARE THE IMPUTED RESULTS MANUALLY BEFORE MOVING ON
 
             self.load_csv(f"merged_Imputed_output.csv", imputed_df)
-
-    def extract_csv(self, file_name):
-        """Load a CSV file from the input folder."""
-        full_path = os.path.join(self.input_path, file_name)
-        df = pd.read_csv(full_path)
-        return df
-    
-    def load_csv(self, file_name, df):
-        """Save result dataframes as CSV files in the output folder."""
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path, exist_ok=True)
-        df.to_csv(os.path.join(self.output_path, file_name), index=False)
-
-        # Copy the final output to the output_copy_path_1
-        if not os.path.exists(self.output_copy_path_1):
-            os.makedirs(self.output_copy_path_1, exist_ok=True)
-        df.to_csv(os.path.join(self.output_copy_path_1, file_name), index=False)
-
-        # Copy the final output to the output_copy_path_2
-        if not os.path.exists(self.output_copy_path_2):
-            os.makedirs(self.output_copy_path_2, exist_ok=True)
-        df.to_csv(os.path.join(self.output_copy_path_2, file_name), index=False)
+            self.copy_output_file(f"merged_Imputed_output.csv", self.output_copy_path_1)
+            self.copy_output_file(f"merged_Imputed_output.csv", self.output_copy_path_2)
 
     
     def compare_imputed_results(self, df_injection, df1, df2):
@@ -124,8 +103,10 @@ class Imputation:
 
         self.load_csv(f"imputation_check_{self.timestamp}.csv", check_df)
 
+    def run(self):
+        """Run the imputation process."""
+        self.impute_missing_values()
+
 
 if __name__ == "__main__":
-    # Create an instance of the Imputation class
-    imputation_generator = Imputation()
-    result = imputation_generator.impute_missing_values()
+    Imputation().run()

@@ -20,17 +20,16 @@ from scipy.stats import mannwhitneyu
 # This tells Python where the root directory of your project is
 basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(basedir)
+from DataProcessor.ProcessorClass import ProcessorClass
 
 from Helpers import enforce_numeric_datatype, detect_changes_between_dataframes
 
-class ANOVAtests:
+class ANOVAtests(ProcessorClass):
     """This class includes methods for ANOVA and Wilcoxon tests(for statistical analysis purposes)."""
 
     def __init__(self):
-        self.input_path = os.path.join(os.path.dirname(__file__), 'input')
-        self.output_path = os.path.join(os.path.dirname(__file__), 'output')
+        super().__init__(__file__)
         # self.output_copy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'PCA', 'input')
-        os.makedirs(self.output_path, exist_ok=True)
         # os.makedirs(self.output_copy_path, exist_ok=True)
         # Add a timestamp attribute for file naming
         self.timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -414,30 +413,6 @@ class ANOVAtests:
 
         return filtered_sig
 
-    def extract_csv(self, file_name):
-        """Load a CSV file from the input folder, case-insensitively if needed."""
-        # Exact match first
-        full_path = os.path.join(self.input_path, file_name)
-        if os.path.exists(full_path):
-            return pd.read_csv(full_path)
-        # Case-insensitive lookup
-        fname_lower = file_name.lower()
-        for f in os.listdir(self.input_path):
-            if f.lower() == fname_lower:
-                return pd.read_csv(os.path.join(self.input_path, f))
-        raise FileNotFoundError(f"Input file not found: {file_name} in {self.input_path}")
-    
-    def load_csv(self, file_name, df):
-        """Save result dataframes as CSV files in the output folder."""
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path, exist_ok=True)
-        df.to_csv(os.path.join(self.output_path, file_name), index=False)
-
-        # # Copy the final output to the output_copy_path
-        # if not os.path.exists(self.output_copy_path):
-        #     os.makedirs(self.output_copy_path, exist_ok=True)
-        # df.to_csv(os.path.join(self.output_copy_path, file_name), index=False)
-
     def compare_anova_results(self, type, source, result):
         """Compare two dataframes to detect changes in anova results."""
         def split_comparison_groups(df):
@@ -494,64 +469,65 @@ class ANOVAtests:
 
         self.load_csv(f"{type}_check_{self.timestamp}.csv", check_df)
 
+    def run(self):
+        # Step 0: Load imputed data
+        raw_df = self.extract_csv("merged_imputed_output.csv")
+        analysis_df = self.prep_ANOVA_data(raw_df)
+
+        # Step 1: Perform Normality / screening tests and save result
+        normality_results = self.screen_normality(
+            analysis_df,
+            group_col="Group",
+            alpha=0.05
+        )
+
+        # Step 2: Branch to ANOVA or Wilcoxon
+        anova_targets = normality_results[normality_results["Use_ANOVA"]==True]["Target"].tolist()
+        ANOVA_p_long, ANOVA_q_long, ANOVA_p_wide, ANOVA_q_wide = (
+            self.run_ANOVA_tests(
+                analysis_df,
+                anova_targets,
+                group_col="Group"
+            )
+        )
+        anova_results = ANOVA_p_long.merge(ANOVA_q_long, on=["Target", "Comparison"], how="outer")
+        
+        wilcoxon_targets = normality_results[normality_results["Use_ANOVA"]==False]["Target"].tolist()  
+
+        Wilcoxon_p_long, Wilcoxon_q_long, Wilcoxon_p_wide, Wilcoxon_q_wide = (
+            self.run_Wilcoxon_tests(
+                analysis_df,
+                wilcoxon_targets,
+                group_col="Group"
+            )
+        )
+        wilcoxon_results = Wilcoxon_p_long.merge(Wilcoxon_q_long, on=["Target", "Comparison"], how="outer")
+        # test block for comparing the results with the previous run in R studio
+        # r_anova_results = self.extract_csv("ANOVA_results.csv")
+        # r_wilcoxon_results = self.extract_csv("Wilcoxon_results.csv")
+        # self.compare_anova_results("ANOVA", r_anova_results, anova_results)
+        # self.compare_anova_results("Wilcoxon", r_wilcoxon_results, wilcoxon_results)
+
+        # Step 3: Merge ANOVA and Wilcoxon outputs
+        combined_all_long, q_for_all_long = (
+        self.merge_test_results(
+                ANOVA_p_long,
+                ANOVA_q_long,
+                Wilcoxon_p_long,
+                Wilcoxon_q_long,
+            )
+        )
+
+        self.load_csv("combined_all_long.csv", combined_all_long)
+
+        filtered_sig = self.filter_significant_results(
+            q_for_all_long,
+            alpha=0.05
+        )
+
+        self.load_csv("significant_targets_long.csv", filtered_sig)
 
 if __name__ == "__main__":
-    # Create an instance of the ANOVA class
-    anova_generator = ANOVAtests()
+    ANOVAtests().run()
 
-    # Step 0: Load imputed data
-    raw_df = anova_generator.extract_csv("merged_imputed_output.csv")
-    analysis_df = anova_generator.prep_ANOVA_data(raw_df)
-
-    # Step 1: Perform Normality / screening tests and save result
-    normality_results = anova_generator.screen_normality(
-        analysis_df,
-        group_col="Group",
-        alpha=0.05
-    )
-
-    # Step 2: Branch to ANOVA or Wilcoxon
-    anova_targets = normality_results[normality_results["Use_ANOVA"]==True]["Target"].tolist()
-    ANOVA_p_long, ANOVA_q_long, ANOVA_p_wide, ANOVA_q_wide = (
-        anova_generator.run_ANOVA_tests(
-            analysis_df,
-            anova_targets,
-            group_col="Group"
-        )
-    )
-    anova_results = ANOVA_p_long.merge(ANOVA_q_long, on=["Target", "Comparison"], how="outer")
     
-    wilcoxon_targets = normality_results[normality_results["Use_ANOVA"]==False]["Target"].tolist()  
-
-    Wilcoxon_p_long, Wilcoxon_q_long, Wilcoxon_p_wide, Wilcoxon_q_wide = (
-        anova_generator.run_Wilcoxon_tests(
-            analysis_df,
-            wilcoxon_targets,
-            group_col="Group"
-        )
-    )
-    wilcoxon_results = Wilcoxon_p_long.merge(Wilcoxon_q_long, on=["Target", "Comparison"], how="outer")
-    # test block for comparing the results with the previous run in R studio
-    # r_anova_results = anova_generator.extract_csv("ANOVA_results.csv")
-    # r_wilcoxon_results = anova_generator.extract_csv("Wilcoxon_results.csv")
-    # anova_generator.compare_anova_results("ANOVA", r_anova_results, anova_results)
-    # anova_generator.compare_anova_results("Wilcoxon", r_wilcoxon_results, wilcoxon_results)
-
-    # Step 3: Merge ANOVA and Wilcoxon outputs
-    combined_all_long, q_for_all_long = (
-    anova_generator.merge_test_results(
-            ANOVA_p_long,
-            ANOVA_q_long,
-            Wilcoxon_p_long,
-            Wilcoxon_q_long,
-        )
-    )
-
-    anova_generator.load_csv("combined_all_long.csv", combined_all_long)
-
-    filtered_sig = anova_generator.filter_significant_results(
-        q_for_all_long,
-        alpha=0.05
-    )
-
-    anova_generator.load_csv("significant_targets_long.csv", filtered_sig)

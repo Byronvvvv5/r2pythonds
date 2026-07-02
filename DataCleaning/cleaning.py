@@ -10,6 +10,7 @@ import sys
 # This tells Python where the root directory of your project is
 basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(basedir)
+from DataProcessor.ProcessorClass import ProcessorClass
 
 from Helpers import enforce_schema, detect_changes_between_dataframes
 from Schema import SampleSchema, HighPHSchema, LowPHSchema
@@ -19,12 +20,11 @@ UNWANTEDCOLUMNS = ['Batch']
 # Everytime running new preprocess, please load files to input directory and update the PROCESSFILES list
 PROCESSFILES = ['sample.xlsx', 'highPH.xlsx', 'lowPH.xlsx']
 
-class Cleaning:
+class Cleaning(ProcessorClass):
     """This class includes methods for loading excel files, mergeing multiple files, droping duplicates and filtering."""
 
     def __init__(self):
-        self.input_path = os.path.join(os.path.dirname(__file__), 'input')
-        self.output_path = os.path.join(os.path.dirname(__file__), 'output')
+        super().__init__(__file__)
         self.output_copy_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Preprocessing', 'input')
         self.dataframes = {}
 
@@ -72,26 +72,10 @@ class Cleaning:
             df_final = df_test.merge(df_sample, on='injectionID', how='left')
         
         self.load_csv('merged_DataCleaning_output.csv', df_final)
+        self.copy_output_file('merged_DataCleaning_output.csv', self.output_copy_path)
 
         return df_final
 
-    def extract_excel(self, file_name):
-        """Load all Excel files in the input folder as separate DataFrames."""
-        full_path = os.path.join(self.input_path, file_name)
-        df = pd.read_excel(full_path)
- 
-        return df
-
-    def load_csv(self, file_name, df):
-        """Save result dataframes as CSV files in the output folder."""
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path, exist_ok=True)
-        df.to_csv(os.path.join(self.output_path, file_name), index=False)
-
-        # Copy the final output to the output_copy_path
-        if not os.path.exists(self.output_copy_path):
-            os.makedirs(self.output_copy_path, exist_ok=True)
-        df.to_csv(os.path.join(self.output_copy_path, file_name), index=False)
 
     def test(self):
         """Test the class methods."""
@@ -117,13 +101,14 @@ class Cleaning:
         )
         # print out to verify the changes
         print(df.to_string(index=False))
+
+    def run(self):
+        """Run the preprocessing."""
+        result = self.preprocess()
+        print(result.shape)
+        # Uncomment the following line to run the test method
+        # self.test()
     
 
 if __name__ == "__main__":
-    # Create an instance of the Cleaning class
-    cleaning_generator = Cleaning()
-    result = cleaning_generator.preprocess()
-    print(result.shape)
-
-    # This is a sample of how to detect 2 dataframes, could be adopted to certain use cases
-    # cleaning_generator.test()
+    Cleaning().run()
