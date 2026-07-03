@@ -16,7 +16,7 @@ basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(basedir)
 from DataProcessor.ProcessorClass import ProcessorClass
 
-from Helpers import enforce_numeric_datatype
+from Helpers import pca_plot_pc1_pc2
 
 
 class PCAPrcomp(ProcessorClass):
@@ -76,7 +76,7 @@ class PCAPrcomp(ProcessorClass):
         self.load_csv(f"PCA_summary_output.csv", summary_df)
         # Step 2: Plot PCA results
         self.pca_plot_variance(pca, scores, df)
-        self.pca_plot_pc1_pc2(pca, scores, df, ellipse_identity='Group', highlight_identity='SampleID')
+        pca_plot_pc1_pc2(pca, scores, df, output_path=self.output_path, ellipse_identity='Group', highlight_identity='SampleID')
 
     
 if __name__ == "__main__":

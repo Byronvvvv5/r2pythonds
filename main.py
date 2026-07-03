@@ -1,10 +1,10 @@
 
-from DataCleaning.cleaning import Cleaning
-from Preprocessing.imputation import Imputation
-from PCA.PCA import PCAPrcomp
-from ANOVA.ANOVA import ANOVAtests
+from projects.SYN.DataCleaning.cleaning import Cleaning
+from projects.SYN.Preprocessing.imputation import Imputation
+from projects.SYN.PCA.PCA import PCAPrcomp
+from projects.SYN.ANOVA.ANOVA import ANOVAtests
 
-def main():
+def SYN_run():
     # First step of this project: Data Cleaning. 
     Cleaning().preprocess()
     # Second step of this project: Imputation. 
@@ -15,4 +15,4 @@ def main():
     ANOVAtests().run()
 
 if __name__ == "__main__":
-    main()
+    SYN_run()
