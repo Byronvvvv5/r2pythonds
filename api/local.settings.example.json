@@ -1,0 +1,23 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "DATA_STORAGE_ACCOUNT_NAME": "yourstorageaccount",
+    "RAW_INPUT_CONTAINER": "raw-input",
+    "PROCESSED_OUTPUT_CONTAINER": "processed-output",
+    "COSMOS_DB_ENDPOINT": "https://your-cosmos.documents.azure.com:443/",
+    "COSMOS_DB_DATABASE_NAME": "r2pythonds",
+    "COSMOS_RUNS_CONTAINER": "runs",
+    "COSMOS_ARTIFACTS_CONTAINER": "artifacts",
+    "AZURE_SUBSCRIPTION_ID": "00000000-0000-0000-0000-000000000000",
+    "AZURE_RESOURCE_GROUP": "rg-r2pythonds-dev",
+    "CONTAINER_JOB_NAME": "r2pythonds-dev-job",
+    "CONTAINER_JOB_CONTAINER_NAME": "pipeline-runner",
+    "CONTAINER_JOB_IMAGE": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+    "CONTAINER_JOB_CPU": "1",
+    "CONTAINER_JOB_MEMORY": "2Gi",
+    "API_AUTH_LEVEL": "FUNCTION",
+    "SAS_EXPIRY_MINUTES": "15"
+  }
+}
