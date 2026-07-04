@@ -3,6 +3,9 @@ targetScope = 'resourceGroup'
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
+@description('Separate location for cosmos due to zoneredundancy')
+param cosmosLocation string = 'germanywestcentral'
+
 @description('Short environment name such as dev, test, or prod.')
 param environmentName string
 
@@ -80,7 +83,7 @@ module functionStorage './modules/storage.bicep' = {
 module cosmos './modules/cosmos.bicep' = {
   name: 'cosmos'
   params: {
-    location: location
+    location: cosmosLocation
     cosmosAccountName: cosmosAccountName
     databaseName: cosmosDatabaseName
     containers: [
