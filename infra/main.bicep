@@ -18,9 +18,6 @@ param tags object = {}
 @description('Container image used by the initial batch job placeholder.')
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
-@description('Python runtime version for the future API function app.')
-param functionRuntimeVersion string = '3.11'
-
 @description('Cosmos DB database name for application metadata.')
 param cosmosDatabaseName string = 'r2pythonds'
 
@@ -75,7 +72,9 @@ module functionStorage './modules/storage.bicep' = {
   params: {
     location: location
     storageAccountName: functionStorageAccountName
-    containerNames: []
+    containerNames: [
+      'deploymentpackage'
+    ]
     tags: commonTags
   }
 }
@@ -107,21 +106,15 @@ module functionApp './modules/functionApp.bicep' = {
     functionPlanName: functionPlanName
     functionAppName: functionAppName
     functionStorageAccountName: functionStorage.outputs.storageAccountName
-    dataStorageAccountName: storage.outputs.storageAccountName
-    rawInputContainerName: 'raw-input'
-    processedOutputContainerName: 'processed-output'
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
-    cosmosEndpoint: cosmos.outputs.cosmosEndpoint
-    cosmosDatabaseName: cosmos.outputs.databaseName
-    azureSubscriptionId: subscription().subscriptionId
-    azureResourceGroupName: resourceGroup().name
-    containerJobName: containerApps.outputs.containerJobName
-    containerJobImage: containerImage
-    containerJobCpu: string(containerCpu)
-    containerJobMemory: containerMemory
-    functionRuntimeVersion: functionRuntimeVersion
     tags: commonTags
   }
+  dependsOn: [
+    functionStorage
+    cosmos
+    storage
+    monitoring
+  ]
 }
 
 module containerApps './modules/containerApps.bicep' = {
@@ -143,12 +136,20 @@ module containerApps './modules/containerApps.bicep' = {
 module roleAssignments './modules/roleAssignments.bicep' = {
   name: 'roleAssignments'
   params: {
-    storageAccountName: storage.outputs.storageAccountName
+    storageAccountName: storageAccountName
+    functionStorageAccountName: functionStorageAccountName
     cosmosAccountId: cosmos.outputs.cosmosAccountId
     cosmosAccountName: cosmos.outputs.cosmosAccountName
-    functionPrincipalId: functionApp.outputs.functionPrincipalId
+    functionPrincipalId: functionApp.outputs.functionAppPrincipalId
     containerPrincipalId: containerApps.outputs.containerPrincipalId
   }
+  dependsOn: [
+    storage
+    functionStorage
+    cosmos
+    functionApp
+    containerApps
+  ]
 }
 
 output storageAccountName string = storage.outputs.storageAccountName
@@ -159,7 +160,7 @@ output cosmosEndpoint string = cosmos.outputs.cosmosEndpoint
 output cosmosDatabaseName string = cosmos.outputs.databaseName
 output cosmosContainerNames array = cosmos.outputs.containerNames
 output functionAppName string = functionApp.outputs.functionAppName
-output functionPrincipalId string = functionApp.outputs.functionPrincipalId
+output functionPrincipalId string = functionApp.outputs.functionAppPrincipalId
 output containerEnvironmentName string = containerApps.outputs.containerEnvironmentName
 output containerJobName string = containerApps.outputs.containerJobName
 output containerPrincipalId string = containerApps.outputs.containerPrincipalId
