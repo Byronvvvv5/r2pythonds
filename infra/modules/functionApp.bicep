@@ -14,55 +14,62 @@ param containerJobName string
 param containerJobImage string
 param containerJobCpu string
 param containerJobMemory string
-param functionRuntimeVersion string
 param tags object = {}
 
-resource functionStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: functionStorageAccountName
 }
 
-resource functionPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
-  name: functionPlanName
-  location: location
-  kind: 'functionapp'
-  tags: tags
-  sku: {
-    tier: 'Dynamic'
-    name: 'Y1'
-  }
-  properties: {}
+resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' existing = {
+  name: '${functionStorageAccountName}/default/deploymentpackage'
 }
 
-var functionStorageKey = listKeys(functionStorageAccount.id, '2023-05-01').keys[0].value
-var functionStorageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${functionStorageAccount.name};AccountKey=${functionStorageKey};EndpointSuffix=${environment().suffixes.storage}'
+resource functionPlan 'Microsoft.Web/serverFarms@2023-12-01' = {
+  name: functionPlanName
+  location: location
+  tags: tags
+  sku: {
+    name: 'FC1'
+    tier: 'FlexConsumption'
+  }
+  kind: 'functionapp,linux'
+  properties: {
+    reserved: true
+  }
+}
 
 resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   location: location
+  tags: tags
   kind: 'functionapp,linux'
   identity: {
     type: 'SystemAssigned'
   }
-  tags: tags
   properties: {
     serverFarmId: functionPlan.id
-    httpsOnly: true
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${functionStorage.properties.primaryEndpoints.blob}deploymentpackage'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 100
+        instanceMemoryMB: 2048
+      }
+      runtime: {
+        name: 'python'
+        version: '3.10'
+      }
+    }
     siteConfig: {
-      linuxFxVersion: 'Python|${functionRuntimeVersion}'
       minTlsVersion: '1.2'
       appSettings: [
-        {
-          name: 'AzureWebJobsStorage'
-          value: functionStorageConnectionString
-        }
-        {
-          name: 'FUNCTIONS_EXTENSION_VERSION'
-          value: '~4'
-        }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'python'
-        }
         {
           name: 'APPINSIGHTS_CONNECTION_STRING'
           value: appInsightsConnectionString
@@ -123,13 +130,15 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'CONTAINER_JOB_MEMORY'
           value: containerJobMemory
         }
+        { 
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsightsConnectionString
+        }
       ]
-      ftpsState: 'Disabled'
     }
-    reserved: true
   }
 }
 
 output functionAppId string = functionApp.id
 output functionAppName string = functionApp.name
-output functionPrincipalId string = functionApp.identity.principalId
+output functionAppPrincipalId string = functionApp.identity.principalId
