@@ -5,8 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from function_app import healthcheck
-
+from api.function_app import transform_run
 
 @patch("function_app.DefaultAzureCredential")
 @patch("function_app.cosmos_client")
@@ -23,7 +22,7 @@ def test_healthcheck_writes_expected_paths(mock_blob_client, mock_cosmos_client,
         "requestedBy": "smoke-test",
     })
 
-    response = healthcheck(req)
+    response = transform_run(req)
 
     assert response.status_code == 200
 
@@ -45,7 +44,7 @@ def test_healthcheck_transforms_csv_rows(mock_blob_client, mock_cosmos_client, m
     upload_mock = mock_blob_client.get_blob_client.return_value.upload_blob
     req = MagicMock(get_json=lambda: {"projectName": "r2pythonds", "datasetId": "smoke-test-ds"})
 
-    healthcheck(req)
+    transform_run(req)
 
     uploaded_bytes = upload_mock.call_args.args[0]
     reader = csv.DictReader(io.StringIO(uploaded_bytes.decode("utf-8")))
@@ -76,7 +75,7 @@ def test_healthcheck_writes_run_and_artifact_documents(mock_blob_client, mock_co
 
     req = MagicMock(get_json=lambda: {"projectName": "r2pythonds", "datasetId": "smoke-test-ds"})
 
-    response = healthcheck(req)
+    response = transform_run(req)
     body = json.loads(response.get_body())
 
     assert body["status"] == "completed"
@@ -103,4 +102,4 @@ def test_healthcheck_missing_value_column_raises(mock_blob_client, mock_cosmos_c
     req = MagicMock(get_json=lambda: {"projectName": "r2pythonds", "datasetId": "smoke-test-ds"})
 
     with pytest.raises(KeyError):
-        healthcheck(req)
+        transform_run(req)
