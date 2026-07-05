@@ -1,0 +1,27 @@
+# Local settings and secrets
+local.settings.json
+local.settings.example.json
+
+# Python dev/test artifacts
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Tests should not ship to production
+tests/
+
+# Dev-only dependency list
+requirements-dev.txt
+
+# Git and CI files
+.git/
+.gitignore
+.github/
+
+# Editor/OS files
+.vscode/
+.DS_Store

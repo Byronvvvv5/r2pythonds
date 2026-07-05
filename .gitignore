@@ -45,3 +45,8 @@ env/
 # Data input/output folders
 DataCleaning/input/
 DataCleaning/output/
+
+design_decisions.md
+
+# Azure Functions local settings (contains secrets/connection strings)
+local.settings.json
