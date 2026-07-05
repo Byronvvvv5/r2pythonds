@@ -67,6 +67,14 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       appSettings: [
         {
+          name: 'AzureWebJobsStorage__accountName'
+          value: functionStorageAccountName
+        }
+        {
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'
+        }
+        {
           name: 'APPINSIGHTS_CONNECTION_STRING'
           value: appInsightsConnectionString
         }
