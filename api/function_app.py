@@ -5,22 +5,54 @@ import azure.functions as func
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 from azure.cosmos import CosmosClient
-from shared import models
+from api.shared import models
+import json
 
 app = func.FunctionApp()
-credential = DefaultAzureCredential()
 
-STORAGE_ACCOUNT_URL = os.environ["STORAGE_ACCOUNT_URL"]
-COSMOS_ENDPOINT = os.environ["COSMOS_DB_ENDPOINT"]
-DB_NAME = os.environ["COSMOS_DB_DATABASE_NAME"]
+def get_settings():
+    storage_account_url = os.environ.get("STORAGE_ACCOUNT_URL")
+    cosmos_endpoint = os.environ.get("COSMOS_DB_ENDPOINT")
+    db_name = os.environ.get("COSMOS_DB_DATABASE_NAME")
 
-blob_client = BlobServiceClient(account_url=STORAGE_ACCOUNT_URL, credential=credential)
-cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
+    missing = [
+        name for name, value in {
+            "STORAGE_ACCOUNT_URL": storage_account_url,
+            "COSMOS_DB_ENDPOINT": cosmos_endpoint,
+            "COSMOS_DB_DATABASE_NAME": db_name,
+        }.items()
+        if not value
+    ]
+    if missing:
+        raise RuntimeError(f"Missing required app settings: {', '.join(missing)}")
+
+    return storage_account_url, cosmos_endpoint, db_name
+
+
+def get_blob_client():
+    storage_account_url, _, _ = get_settings()
+    credential = DefaultAzureCredential()
+    return BlobServiceClient(account_url=storage_account_url, credential=credential)
+
+
+def get_cosmos_client():
+    _, cosmos_endpoint, _ = get_settings()
+    credential = DefaultAzureCredential()
+    return CosmosClient(cosmos_endpoint, credential=credential)
+
+
+def get_db_name():
+    _, _, db_name = get_settings()
+    return db_name
 
 @app.route(route="runs/{run_id}/transform", methods=["POST"])
 def transform_run(req: func.HttpRequest) -> func.HttpResponse:
+    blob_client = get_blob_client()
+    cosmos_client = get_cosmos_client()
+    db_name = get_db_name()
+    
     run_id = req.route_params.get("run_id")
-    db = cosmos_client.get_database_client(DB_NAME)
+    db = cosmos_client.get_database_client(db_name)
     runs_container = db.get_container_client("runs")
     artifacts_container = db.get_container_client("artifacts")
 
@@ -70,8 +102,12 @@ def transform_run(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="runs/{run_id}", methods=["GET"])
 def get_run(req: func.HttpRequest) -> func.HttpResponse:
+    blob_client = get_blob_client()
+    cosmos_client = get_cosmos_client()
+    db_name = get_db_name()
+
     run_id = req.route_params.get("run_id")
-    db = cosmos_client.get_database_client(DB_NAME)
+    db = cosmos_client.get_database_client(db_name)
     run_doc = db.get_container_client("runs").read_item(item=run_id, partition_key=run_id)
 
     artifacts_container = db.get_container_client("artifacts")
@@ -90,6 +126,9 @@ def get_run(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="runs", methods=["POST"])
 def create_run(req: func.HttpRequest) -> func.HttpResponse:
+    cosmos_client = get_cosmos_client()
+    db_name = get_db_name()     
+
     payload = req.get_json()
     run_doc = models.new_run_document(payload)
     run_doc = models.finalize_run_document(run_doc)
@@ -109,7 +148,7 @@ def create_run(req: func.HttpRequest) -> func.HttpResponse:
     run_doc["status"] = "awaiting_input"
     run_doc["updatedAt"] = models.utc_now_iso()
 
-    db = cosmos_client.get_database_client(DB_NAME)
+    db = cosmos_client.get_database_client(db_name)
     db.get_container_client("runs").upsert_item(run_doc)
     db.get_container_client("artifacts").upsert_item(input_artifact)
 
