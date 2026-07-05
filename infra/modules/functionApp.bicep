@@ -75,6 +75,14 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           value: 'managedidentity'
         }
         {
+          name: 'ENABLE_ORYX_BUILD'
+          value: 'true'
+        }
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: 'true'
+        }
+        {
           name: 'APPINSIGHTS_CONNECTION_STRING'
           value: appInsightsConnectionString
         }
