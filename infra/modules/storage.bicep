@@ -39,14 +39,6 @@ resource containers 'Microsoft.Storage/storageAccounts/blobServices/containers@2
   }
 }]
 
-resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
-  name: 'deploymentpackage'
-  parent: blobService
-  properties: {
-    publicAccess: 'None'
-  }
-}
-
 output storageAccountId string = storageAccount.id
 output storageAccountName string = storageAccount.name
 output blobEndpoint string = storageAccount.properties.primaryEndpoints.blob
