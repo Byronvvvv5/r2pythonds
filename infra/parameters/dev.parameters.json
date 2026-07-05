@@ -22,6 +22,12 @@
     },
     "cosmosDatabaseName": {
       "value": "r2pythonds"
+    },
+      "apimPublisherEmail": { 
+        "value": "byronev.r2pds@gmail.com" 
+    },
+    "apimPublisherName": { 
+      "value": "R2PDS Platform Team" 
     }
   }
 }

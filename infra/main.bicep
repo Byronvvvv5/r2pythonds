@@ -27,6 +27,12 @@ param containerCpu int = 1
 @description('Memory requested by the container job in Gi.')
 param containerMemory string = '2Gi'
 
+@description('Publisher email for API management')
+param apimPublisherEmail string
+
+@description('Publisher name for API management')
+param apimPublisherName string
+
 var normalizedWorkloadName = toLower(replace(replace(workloadName, '-', ''), '_', ''))
 var uniqueSuffix = toLower(uniqueString(subscription().subscriptionId, resourceGroup().id, environmentName, workloadName))
 var storageAccountName = take('${normalizedWorkloadName}${environmentName}${uniqueSuffix}', 24)
@@ -43,6 +49,7 @@ var commonTags = union({
   environment: environmentName
   managedBy: 'bicep'
 }, tags)
+var apimName = take('${normalizedWorkloadName}-${environmentName}-${uniqueSuffix}-apim', 50)
 
 module monitoring './modules/monitoring.bicep' = {
   name: 'monitoring'
@@ -146,6 +153,21 @@ module containerApps './modules/containerApps.bicep' = {
     memory: containerMemory
     tags: commonTags
   }
+}
+
+module apim 'modules/apim.bicep' = {
+  name: 'apim'
+  params: {
+    location: location
+    apimName: apimName
+    publisherEmail: apimPublisherEmail
+    publisherName: apimPublisherName
+    functionAppHostname: functionApp.outputs.functionAppHostname
+    tags: tags
+  }
+  dependsOn: [
+    functionApp
+  ]
 }
 
 module roleAssignments './modules/roleAssignments.bicep' = {
