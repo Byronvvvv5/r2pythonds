@@ -12,16 +12,12 @@ param azureSubscriptionId string
 param azureResourceGroupName string
 param containerJobName string
 param containerJobImage string
-param containerJobCpu string
+param containerJobCpu int
 param containerJobMemory string
 param tags object = {}
 
 resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: functionStorageAccountName
-}
-
-resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' existing = {
-  name: '${functionStorageAccountName}/default/deploymentpackage'
 }
 
 resource functionPlan 'Microsoft.Web/serverFarms@2023-12-01' = {

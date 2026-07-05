@@ -108,6 +108,21 @@ module functionApp './modules/functionApp.bicep' = {
     functionStorageAccountName: functionStorage.outputs.storageAccountName
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     tags: commonTags
+
+    dataStorageAccountName: storage.outputs.storageAccountName
+    rawInputContainerName: 'raw-input'
+    processedOutputContainerName: 'processed-output'
+
+    cosmosEndpoint: cosmos.outputs.cosmosEndpoint
+    cosmosDatabaseName: cosmos.outputs.databaseName
+
+    azureSubscriptionId: subscription().subscriptionId
+    azureResourceGroupName: resourceGroup().name
+
+    containerJobName: containerJobName
+    containerJobImage: containerImage
+    containerJobCpu: containerCpu
+    containerJobMemory: containerMemory
   }
   dependsOn: [
     functionStorage
