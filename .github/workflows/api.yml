@@ -48,3 +48,7 @@ jobs:
         with:
           app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
           package: 'api'
+          sku: 'flexconsumption'
+          scm-do-build-during-deployment: ''
+          enable-oryx-build: ''
+          remote-build: false
