@@ -3,12 +3,12 @@ import io
 import json
 from unittest.mock import patch, MagicMock
 
-from api.function_app import transform_run
+from function_app import transform_run
 
 
-@patch("api.function_app.get_db_name", return_value="testdb")
-@patch("api.function_app.get_cosmos_client")
-@patch("api.function_app.get_blob_client")
+@patch("function_app.get_db_name", return_value="testdb")
+@patch("function_app.get_cosmos_client")
+@patch("function_app.get_blob_client")
 def test_transform_run_writes_expected_output(mock_get_blob_client, mock_get_cosmos_client, mock_get_db_name):
     blob_client = MagicMock()
     cosmos_client = MagicMock()
