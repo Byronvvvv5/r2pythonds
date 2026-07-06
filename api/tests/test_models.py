@@ -1,4 +1,4 @@
-from api.shared.models import build_input_blob_path, build_output_prefix, finalize_run_document, new_run_document
+from shared.models import build_input_blob_path, build_output_prefix, finalize_run_document, new_run_document
 
 def test_build_input_blob_path_is_deterministic():
     path = build_input_blob_path('SYN', 'Batch 01', 'run-123', 'test file.csv')
