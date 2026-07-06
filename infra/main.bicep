@@ -95,7 +95,7 @@ module cosmos './modules/cosmos.bicep' = {
     containers: [
       {
         name: 'runs'
-        partitionKeyPath: '/projectName'
+        partitionKeyPath: '/runId'
       }
       {
         name: 'artifacts'
@@ -130,6 +130,7 @@ module functionApp './modules/functionApp.bicep' = {
     containerJobImage: containerImage
     containerJobCpu: containerCpu
     containerJobMemory: containerMemory
+    storageAccountURL: storage.outputs.blobEndpoint
   }
   dependsOn: [
     functionStorage

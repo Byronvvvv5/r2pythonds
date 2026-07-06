@@ -15,6 +15,7 @@ param containerJobImage string
 param containerJobCpu int
 param containerJobMemory string
 param tags object = {}
+param storageAccountURL string
 
 resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: functionStorageAccountName
@@ -137,6 +138,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         { 
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsightsConnectionString
+        }
+        {
+          name: 'STORAGE_ACCOUNT_URL'
+          value: storageAccountURL
         }
       ]
     }
