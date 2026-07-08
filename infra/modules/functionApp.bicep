@@ -16,6 +16,7 @@ param containerJobCpu int
 param containerJobMemory string
 param tags object = {}
 param storageAccountURL string
+param vnetIntegrationSubnetId string = ''
 
 resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: functionStorageAccountName
@@ -45,6 +46,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   }
   properties: {
     serverFarmId: functionPlan.id
+    virtualNetworkSubnetId: vnetIntegrationSubnetId 
     functionAppConfig: {
       deployment: {
         storage: {
@@ -67,6 +69,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     siteConfig: {
       minTlsVersion: '1.2'
       appSettings: [
+        {
+          name: 'WEBSITE_DNS_SERVER'
+          value: '168.63.129.16'  // Azure's internal DNS, picks up private zones
+        }
         {
           name: 'AzureWebJobsStorage__accountName'
           value: functionStorageAccountName
