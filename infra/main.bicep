@@ -36,6 +36,19 @@ param apimPublisherName string
 @description('Enable private networking (VNet, private endpoints, DNS) for Stage 1 data isolation.')
 param enablePrivateNetworking bool = false
 
+@description('Add inbound private endpoint for the Function App HTTP surface. Requires enablePrivateNetworking: true.')
+param enableFunctionInboundPrivate bool = false
+
+@description('Deploy a test VM inside the VNet for internal-path validation. Requires enablePrivateNetworking: true.')
+param deployTestVm bool = false
+
+@secure()
+@description('SSH public key for the test VM, e.g. contents of ~/.ssh/id_rsa.pub. Required when deployTestVm is true.')
+param testVmAdminPublicKey string = ''
+
+@description('Source IP in CIDR notation allowed to SSH to the test VM, e.g. 203.0.113.10/32.')
+param testVmAllowSshFromIp string = ''
+
 var normalizedWorkloadName = toLower(replace(replace(workloadName, '-', ''), '_', ''))
 var uniqueSuffix = toLower(uniqueString(subscription().subscriptionId, resourceGroup().id, environmentName, workloadName))
 var storageAccountName = take('${normalizedWorkloadName}${environmentName}${uniqueSuffix}', 24)
@@ -195,6 +208,30 @@ module peCosmosSql './modules/privateEndpoint.bicep' = if (enablePrivateNetworki
   }
 }
 
+module peFunctionApp './modules/privateEndpoint.bicep' = if (enableFunctionInboundPrivate) {
+  name: 'peFunctionApp'
+  params: {
+    location: location
+    name: 'pep-${functionAppName}-sites'
+    subnetId: networking.outputs.privateEndpointSubnetId
+    targetResourceId: functionApp.outputs.functionAppId
+    groupId: 'sites'
+    privateDnsZoneId: privateDns.outputs.functionAppDnsZoneId
+    tags: commonTags
+  }
+}
+
+module testVm './modules/testVm.bicep' = if (deployTestVm && enablePrivateNetworking) {
+  name: 'testVm'
+  params: {
+    location: location
+    subnetId: networking.outputs.testSubnetId
+    adminPublicKey: testVmAdminPublicKey
+    allowSshFromIp: testVmAllowSshFromIp
+    tags: commonTags
+  }
+}
+
 module functionApp './modules/functionApp.bicep' = {
   name: 'functionApp'
   params: {
@@ -221,6 +258,7 @@ module functionApp './modules/functionApp.bicep' = {
     containerJobMemory: containerMemory
     storageAccountURL: storage.outputs.blobEndpoint
     vnetIntegrationSubnetId: enablePrivateNetworking ? networking.outputs.functionOutboundSubnetId : ''
+    disablePublicInboundAccess: enableFunctionInboundPrivate
   }
   dependsOn: [
     functionStorage

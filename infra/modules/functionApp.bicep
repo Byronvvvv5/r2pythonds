@@ -17,6 +17,7 @@ param containerJobMemory string
 param tags object = {}
 param storageAccountURL string
 param vnetIntegrationSubnetId string = ''
+param disablePublicInboundAccess bool = false
 
 resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: functionStorageAccountName
@@ -46,7 +47,8 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   }
   properties: {
     serverFarmId: functionPlan.id
-    virtualNetworkSubnetId: vnetIntegrationSubnetId 
+    virtualNetworkSubnetId: vnetIntegrationSubnetId
+    publicNetworkAccess: disablePublicInboundAccess ? 'Disabled' : 'Enabled' 
     functionAppConfig: {
       deployment: {
         storage: {

@@ -65,7 +65,24 @@ resource documentsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
   }
 }
 
+resource functionAppZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.azurewebsites.net'
+  location: 'global'
+  tags: tags
+}
+
+resource functionAppZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  name: 'link-functionapp'
+  parent: functionAppZone
+  location: 'global'
+  properties: {
+    virtualNetwork: { id: vnetId }
+    registrationEnabled: false
+  }
+}
+
 output blobDnsZoneId string = blobZone.id
 output queueDnsZoneId string = queueZone.id
 output tableDnsZoneId string = tableZone.id
 output documentsDnsZoneId string = documentsZone.id
+output functionAppDnsZoneId string = functionAppZone.id

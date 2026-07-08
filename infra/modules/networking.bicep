@@ -3,6 +3,7 @@ param vnetName string
 param vnetAddressPrefix string = '10.0.0.0/16'
 param privateEndpointSubnetPrefix string = '10.0.1.0/24'
 param functionOutboundSubnetPrefix string = '10.0.2.0/24'
+param testSubnetPrefix string = '10.0.3.0/28'
 param tags object = {}
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
@@ -38,6 +39,12 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
           ]
         }
       }
+      {
+        name: 'snet-test'
+        properties: {
+          addressPrefix: testSubnetPrefix
+        }
+      }
     ]
   }
 }
@@ -46,3 +53,4 @@ output vnetId string = vnet.id
 output vnetName string = vnet.name
 output privateEndpointSubnetId string = '${vnet.id}/subnets/snet-private-endpoints'
 output functionOutboundSubnetId string = '${vnet.id}/subnets/snet-function-outbound'
+output testSubnetId string = '${vnet.id}/subnets/snet-test'
