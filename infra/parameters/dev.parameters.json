@@ -28,6 +28,9 @@
     },
     "apimPublisherName": { 
       "value": "R2PDS Platform Team" 
+    },
+    "enablePrivateNetworking": {
+      "value": true
     }
   }
 }
