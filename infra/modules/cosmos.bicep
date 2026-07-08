@@ -3,6 +3,7 @@ param cosmosAccountName string
 param databaseName string
 param containers array
 param tags object = {}
+param disablePublicNetworkAccess bool = false
 
 resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
   name: cosmosAccountName
@@ -20,7 +21,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
         isZoneRedundant: false
       }
     ]
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: disablePublicNetworkAccess ? 'Disabled' : 'Enabled'
     capabilities: []
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'

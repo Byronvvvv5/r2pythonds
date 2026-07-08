@@ -33,6 +33,9 @@ param apimPublisherEmail string
 @description('Publisher name for API management')
 param apimPublisherName string
 
+@description('Enable private networking (VNet, private endpoints, DNS) for Stage 1 data isolation.')
+param enablePrivateNetworking bool = false
+
 var normalizedWorkloadName = toLower(replace(replace(workloadName, '-', ''), '_', ''))
 var uniqueSuffix = toLower(uniqueString(subscription().subscriptionId, resourceGroup().id, environmentName, workloadName))
 var storageAccountName = take('${normalizedWorkloadName}${environmentName}${uniqueSuffix}', 24)
@@ -50,6 +53,7 @@ var commonTags = union({
   managedBy: 'bicep'
 }, tags)
 var apimName = take('${normalizedWorkloadName}-${environmentName}-${uniqueSuffix}-apim', 50)
+var vnetName = '${normalizedWorkloadName}-${environmentName}-vnet'
 
 module monitoring './modules/monitoring.bicep' = {
   name: 'monitoring'
@@ -57,6 +61,23 @@ module monitoring './modules/monitoring.bicep' = {
     location: location
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
     appInsightsName: appInsightsName
+    tags: commonTags
+  }
+}
+
+module networking './modules/networking.bicep' = if (enablePrivateNetworking) {
+  name: 'networking'
+  params: {
+    location: location
+    vnetName: vnetName
+    tags: commonTags
+  }
+}
+
+module privateDns './modules/privateDns.bicep' = if (enablePrivateNetworking) {
+  name: 'privateDns'
+  params: {
+    vnetId: networking.outputs.vnetId
     tags: commonTags
   }
 }
@@ -71,6 +92,7 @@ module storage './modules/storage.bicep' = {
       'processed-output'
     ]
     tags: commonTags
+    disablePublicNetworkAccess: enablePrivateNetworking
   }
 }
 
@@ -83,6 +105,7 @@ module functionStorage './modules/storage.bicep' = {
       'deploymentpackage'
     ]
     tags: commonTags
+    disablePublicNetworkAccess: enablePrivateNetworking
   }
 }
 
@@ -102,6 +125,72 @@ module cosmos './modules/cosmos.bicep' = {
         partitionKeyPath: '/runId'
       }
     ]
+    tags: commonTags
+    disablePublicNetworkAccess: enablePrivateNetworking
+  }
+}
+
+module peStorageBlob './modules/privateEndpoint.bicep' = if (enablePrivateNetworking) {
+  name: 'peStorageBlob'
+  params: {
+    location: location
+    name: 'pep-${storageAccountName}-blob'
+    subnetId: networking.outputs.privateEndpointSubnetId
+    targetResourceId: storage.outputs.storageAccountId
+    groupId: 'blob'
+    privateDnsZoneId: privateDns.outputs.blobDnsZoneId
+    tags: commonTags
+  }
+}
+
+module peFuncStorageBlob './modules/privateEndpoint.bicep' = if (enablePrivateNetworking) {
+  name: 'peFuncStorageBlob'
+  params: {
+    location: location
+    name: 'pep-${functionStorageAccountName}-blob'
+    subnetId: networking.outputs.privateEndpointSubnetId
+    targetResourceId: functionStorage.outputs.storageAccountId
+    groupId: 'blob'
+    privateDnsZoneId: privateDns.outputs.blobDnsZoneId
+    tags: commonTags
+  }
+}
+
+module peFuncStorageQueue './modules/privateEndpoint.bicep' = if (enablePrivateNetworking) {
+  name: 'peFuncStorageQueue'
+  params: {
+    location: location
+    name: 'pep-${functionStorageAccountName}-queue'
+    subnetId: networking.outputs.privateEndpointSubnetId
+    targetResourceId: functionStorage.outputs.storageAccountId
+    groupId: 'queue'
+    privateDnsZoneId: privateDns.outputs.queueDnsZoneId
+    tags: commonTags
+  }
+}
+
+module peFuncStorageTable './modules/privateEndpoint.bicep' = if (enablePrivateNetworking) {
+  name: 'peFuncStorageTable'
+  params: {
+    location: location
+    name: 'pep-${functionStorageAccountName}-table'
+    subnetId: networking.outputs.privateEndpointSubnetId
+    targetResourceId: functionStorage.outputs.storageAccountId
+    groupId: 'table'
+    privateDnsZoneId: privateDns.outputs.tableDnsZoneId
+    tags: commonTags
+  }
+}
+
+module peCosmosSql './modules/privateEndpoint.bicep' = if (enablePrivateNetworking) {
+  name: 'peCosmosSql'
+  params: {
+    location: location
+    name: 'pep-${cosmosAccountName}-sql'
+    subnetId: networking.outputs.privateEndpointSubnetId
+    targetResourceId: cosmos.outputs.cosmosAccountId
+    groupId: 'Sql'
+    privateDnsZoneId: privateDns.outputs.documentsDnsZoneId
     tags: commonTags
   }
 }

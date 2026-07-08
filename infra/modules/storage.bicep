@@ -2,6 +2,7 @@ param location string
 param storageAccountName string
 param containerNames array
 param tags object = {}
+param disablePublicNetworkAccess bool = false
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -16,6 +17,11 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     allowBlobPublicAccess: false
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
+    publicNetworkAccess: disablePublicNetworkAccess ? 'Disabled' : 'Enabled'
+    networkAcls: {
+      defaultAction: disablePublicNetworkAccess ? 'Deny' : 'Allow'
+      bypass: 'AzureServices'
+    }
   }
 }
 
