@@ -220,6 +220,7 @@ module functionApp './modules/functionApp.bicep' = {
     containerJobCpu: containerCpu
     containerJobMemory: containerMemory
     storageAccountURL: storage.outputs.blobEndpoint
+    vnetIntegrationSubnetId: enablePrivateNetworking ? networking.outputs.functionOutboundSubnetId : ''
   }
   dependsOn: [
     functionStorage
