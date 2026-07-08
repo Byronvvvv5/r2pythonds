@@ -39,15 +39,8 @@ param enablePrivateNetworking bool = false
 @description('Add inbound private endpoint for the Function App HTTP surface. Requires enablePrivateNetworking: true.')
 param enableFunctionInboundPrivate bool = false
 
-@description('Deploy a test VM inside the VNet for internal-path validation. Requires enablePrivateNetworking: true.')
-param deployTestVm bool = false
-
-@secure()
-@description('SSH public key for the test VM, e.g. contents of ~/.ssh/id_rsa.pub. Required when deployTestVm is true.')
-param testVmAdminPublicKey string = ''
-
-@description('Source IP in CIDR notation allowed to SSH to the test VM, e.g. 203.0.113.10/32.')
-param testVmAllowSshFromIp string = ''
+@description('Deploy a test container inside the VNet for internal-path validation. Requires enablePrivateNetworking: true.')
+param deployTestContainer bool = false
 
 var normalizedWorkloadName = toLower(replace(replace(workloadName, '-', ''), '_', ''))
 var uniqueSuffix = toLower(uniqueString(subscription().subscriptionId, resourceGroup().id, environmentName, workloadName))
@@ -221,13 +214,11 @@ module peFunctionApp './modules/privateEndpoint.bicep' = if (enableFunctionInbou
   }
 }
 
-module testVm './modules/testVm.bicep' = if (deployTestVm && enablePrivateNetworking) {
-  name: 'testVm'
+module testContainer './modules/testContainer.bicep' = if (deployTestContainer && enablePrivateNetworking) {
+  name: 'testContainer'
   params: {
     location: location
     subnetId: networking.outputs.testSubnetId
-    adminPublicKey: testVmAdminPublicKey
-    allowSshFromIp: testVmAllowSshFromIp
     tags: commonTags
   }
 }

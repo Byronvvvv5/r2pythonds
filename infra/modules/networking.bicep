@@ -43,6 +43,14 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
         name: 'snet-test'
         properties: {
           addressPrefix: testSubnetPrefix
+          delegations: [
+            {
+              name: 'delegation-aci'
+              properties: {
+                serviceName: 'Microsoft.ContainerInstance/containerGroups'
+              }
+            }
+          ]
         }
       }
     ]
