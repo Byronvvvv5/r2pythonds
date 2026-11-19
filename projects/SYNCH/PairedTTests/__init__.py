@@ -1,3 +1,3 @@
-from PairedTTests import PairedTTest
+from .PairedTTest import PairedTTests
 
-__all__ = ['PairedTTest']
+__all__ = ['PairedTTests']

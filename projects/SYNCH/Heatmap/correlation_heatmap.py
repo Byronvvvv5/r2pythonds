@@ -1,469 +1,215 @@
-
-# ============================================================
-# correlation_heatmap.py
-# ============================================================
-
+import os
 import re
-from pathlib import Path
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-
-# ============================================================
-# 1. DEFINE PATHS
-# ============================================================
-
-base_dir = Path(__file__).resolve().parent
-
-input_dir = base_dir / "input"
-output_dir = base_dir / "output"
-
-correlation_file = (
-    output_dir / "repeat_measures_corelation_clinic_results.csv"
-)
-
-clinic_before_file = input_dir / "clinic_before.csv"
-lipid_file = input_dir / "cleaned_synch_truth_treatmentgroup.csv"
-
-heatmap_output_dir = output_dir / "correlation_heatmaps"
-heatmap_output_dir.mkdir(parents=True, exist_ok=True)
-
-
-# ============================================================
-# 2. SETTINGS
-# ============================================================
-
-r_threshold = 0.6
-
-treatment_order = [
-    "Synbiotics",
-    "Synbiotics + FMT"
-]
-
-
-# ============================================================
-# 3. READ DATA
-# ============================================================
-
-corr_df = pd.read_csv(correlation_file)
-
-clinic_before = pd.read_csv(clinic_before_file)
-lipid_raw = pd.read_csv(lipid_file)
-
-print(f"Loaded {len(corr_df)} correlation results")
-
-
-# ============================================================
-# 4. RECONSTRUCT CLINICAL MARKER AND LIPID COLUMN NAMES
-#    BASED ON ORIGINAL PREPROCESSING
-# ============================================================
-
-# ---- Clinical markers ----
-
-clinic_before.columns = clinic_before.columns.str.replace(
-    r"^before_", "",
-    regex=True
-)
-
-# Original preprocessing uses the first 3 columns as metadata
-clinic_columns = clinic_before.columns[3:].tolist()
-
-
-# ---- Lipids ----
-
-# Original preprocessing:
-# df_lipids = df_lipids.iloc[:, 2:]
-# Then treatment_group and Time are moved to the front.
-#
-# Therefore the lipid feature columns are those remaining
-# after the metadata columns in the transformed dataframe.
-
-lipid_columns = lipid_raw.columns[2:].tolist()
-
-
-# ============================================================
-# 5. MATCH CORRELATION TITLE TO CLINICAL MARKER AND LIPID
-# ============================================================
-
-# Original title format:
-# f"{col_1} - {col_2}"
-#
-# col_1 = clinical marker
-# col_2 = lipid
-
-title_mapping = {}
-
-for clinic in clinic_columns:
-    for lipid in lipid_columns:
-
-        title = f"{clinic} - {lipid}"
-
-        title_mapping[title] = {
-            "clinic_marker": clinic,
-            "lipid": lipid
-        }
-
-
-# ---- Match title ----
-
-corr_df["title"] = corr_df["title"].astype(str)
-
-corr_df["clinic_marker"] = corr_df["title"].map(
-    lambda x: title_mapping.get(x, {}).get("clinic_marker")
-)
-
-corr_df["lipid"] = corr_df["title"].map(
-    lambda x: title_mapping.get(x, {}).get("lipid")
-)
-
-
-# ---- Check unmatched titles ----
-
-unmatched = corr_df[
-    corr_df["clinic_marker"].isna()
-    | corr_df["lipid"].isna()
-]
-
-if not unmatched.empty:
-
-    print("\nWARNING: Some correlation titles could not be matched.")
-
-    print(
-        unmatched["title"].head(20).to_string(index=False)
-    )
-
-
-# ============================================================
-# 6. FILTER STRONG CORRELATIONS
-# ============================================================
-
-corr_df["r"] = pd.to_numeric(
-    corr_df["r"],
-    errors="coerce"
-)
-
-corr_filtered = corr_df[
-    (corr_df["r"] > r_threshold)
-    | (corr_df["r"] < -r_threshold)
-].copy()
-
-
-# Remove unmatched entries
-corr_filtered = corr_filtered.dropna(
-    subset=["clinic_marker", "lipid", "r"]
-)
-
-
-# ============================================================
-# 7. SAVE FILTERED CORRELATION RESULTS
-# ============================================================
-
-filtered_file = (
-    heatmap_output_dir / "strong_correlations.csv"
-)
-
-corr_filtered.to_csv(
-    filtered_file,
-    index=False
-)
-
-print(f"\nTotal correlations: {len(corr_df)}")
-print(f"Strong correlations: {len(corr_filtered)}")
-print(f"Filtered results saved: {filtered_file}")
-
-
-# ============================================================
-# 8. DRAW HEATMAPS
-# ============================================================
+import sys
 
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
-sns.set_theme(style="white")
-
-
-# ---- Create a custom colormap ----
-# Correlations with |r| < 0.3 will appear grey.
-
-base_cmap = plt.get_cmap("RdBu_r", 256)
-cmap_colors = base_cmap(np.linspace(0, 1, 256))
-
-# Values from -0.3 to +0.3 correspond approximately
-# to indices 89 to 166 in the -1 to +1 scale.
-grey_start = int(((-0.3 + 1) / 2) * 256)
-grey_end = int(((0.3 + 1) / 2) * 256)
-
-cmap_colors[grey_start:grey_end] = mcolors.to_rgba("#D3D3D3")
-
-custom_cmap = mcolors.ListedColormap(cmap_colors)
+# This tells Python where the root directory of your project is
+basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(basedir)
+from DataProcessor.ProcessorClass import ProcessorClass
 
 
-for treatment in treatment_order:
+class CorrelationHeatmap(ProcessorClass):
+    """Heatmaps of repeated-measures lipid-clinical correlations per treatment group."""
 
-    # ========================================================
-    # 8A. ORIGINAL THRESHOLD HEATMAP
-    #     Only |r| > 0.6
-    # ========================================================
+    def __init__(self):
+        super().__init__(__file__)
+        self.heatmap_output_path = os.path.join(self.output_path, "correlation_heatmaps")
+        os.makedirs(self.heatmap_output_path, exist_ok=True)
 
-    treatment_df = corr_filtered[
-        corr_filtered["treatment"] == treatment
-    ].copy()
+        self.r_threshold = 0.6
+        self.treatment_order = ["Synbiotics", "Synbiotics + FMT"]
 
-    if not treatment_df.empty:
+    def get_clinic_columns(self, clinic_before):
+        """Clinical marker names as built in Corelation preprocessing (strip 'before_', skip 3 metadata columns)."""
+        columns = clinic_before.columns.str.replace(r"^before_", "", regex=True)
+        return columns[3:].tolist()
 
-        heatmap_data = treatment_df.pivot(
-            index="clinic_marker",
-            columns="lipid",
-            values="r"
+    def get_lipid_columns(self, lipid_raw):
+        """Lipid names as built in Corelation preprocessing (skip first 2 columns)."""
+        return lipid_raw.columns[2:].tolist()
+
+    def build_title_mapping(self, clinic_columns, lipid_columns):
+        """Map correlation title 'clinic - lipid' back to its clinical marker and lipid."""
+        return {
+            f"{clinic} - {lipid}": {"clinic_marker": clinic, "lipid": lipid}
+            for clinic in clinic_columns
+            for lipid in lipid_columns
+        }
+
+    def match_titles(self, corr_df, title_mapping):
+        """Add clinic_marker and lipid columns to correlation results; warn about unmatched titles."""
+        corr_df = corr_df.copy()
+        corr_df["title"] = corr_df["title"].astype(str)
+        corr_df["clinic_marker"] = corr_df["title"].map(
+            lambda x: title_mapping.get(x, {}).get("clinic_marker")
+        )
+        corr_df["lipid"] = corr_df["title"].map(
+            lambda x: title_mapping.get(x, {}).get("lipid")
         )
 
-        heatmap_data = heatmap_data.sort_index()
+        unmatched = corr_df[corr_df["clinic_marker"].isna() | corr_df["lipid"].isna()]
+        if not unmatched.empty:
+            print("\nWARNING: Some correlation titles could not be matched.")
+            print(unmatched["title"].head(20).to_string(index=False))
 
-        heatmap_data = heatmap_data.reindex(
-            sorted(heatmap_data.columns),
-            axis=1
-        )
+        corr_df["r"] = pd.to_numeric(corr_df["r"], errors="coerce")
 
-        fig_width = max(
-            10,
-            heatmap_data.shape[1] * 0.5
-        )
+        return corr_df
 
-        fig_height = max(
-            6,
-            heatmap_data.shape[0] * 0.5
-        )
+    def filter_strong_correlations(self, corr_df):
+        """Keep matched correlations with |r| > r_threshold."""
+        corr_filtered = corr_df[
+            (corr_df["r"] > self.r_threshold) | (corr_df["r"] < -self.r_threshold)
+        ].copy()
 
-        fig, ax = plt.subplots(
-            figsize=(fig_width, fig_height)
-        )
+        return corr_filtered.dropna(subset=["clinic_marker", "lipid", "r"])
+
+    def build_heatmap_matrix(self, df):
+        """Pivot to clinical markers (rows) x lipids (columns), both sorted."""
+        matrix = df.pivot(index="clinic_marker", columns="lipid", values="r")
+        matrix = matrix.sort_index()
+        return matrix.reindex(sorted(matrix.columns), axis=1)
+
+    def build_annotation_matrix(self, matrix):
+        """Text labels: show r only where |r| > r_threshold, otherwise empty."""
+        annotation = matrix.copy().astype(object)
+
+        for row in annotation.index:
+            for col in annotation.columns:
+                value = matrix.loc[row, col]
+                if pd.notna(value) and abs(value) > self.r_threshold:
+                    annotation.loc[row, col] = f"{value:.2f}"
+                else:
+                    annotation.loc[row, col] = ""
+
+        return annotation
+
+    def build_grey_center_cmap(self):
+        """RdBu_r colormap where |r| < 0.3 is shown grey."""
+        cmap_colors = plt.get_cmap("RdBu_r", 256)(np.linspace(0, 1, 256))
+
+        # Map -0.3..+0.3 on the -1..+1 scale to colormap indices
+        grey_start = int(((-0.3 + 1) / 2) * 256)
+        grey_end = int(((0.3 + 1) / 2) * 256)
+        cmap_colors[grey_start:grey_end] = mcolors.to_rgba("#D3D3D3")
+
+        return mcolors.ListedColormap(cmap_colors)
+
+    def draw_heatmap(self, matrix, title, cmap, annot, fmt):
+        """Draw one correlation heatmap. Returns fig, ax."""
+        fig_width = max(10, matrix.shape[1] * 0.5)
+        fig_height = max(6, matrix.shape[0] * 0.5)
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
         sns.heatmap(
-            heatmap_data,
-            cmap="RdBu_r",
+            matrix,
+            cmap=cmap,
             vmin=-1,
             vmax=1,
             center=0,
-            annot=True,
-            fmt=".2f",
+            annot=annot,
+            fmt=fmt,
             linewidths=0.5,
             linecolor="white",
-            mask=heatmap_data.isna(),
-            cbar_kws={
-                "label": "Repeated-measures correlation (r)"
-            },
+            mask=matrix.isna(),
+            cbar_kws={"label": "Repeated-measures correlation (r)"},
             ax=ax
         )
 
-        ax.set_title(
-            f"{treatment}\nStrong lipid-clinical correlations",
-            fontsize=14,
-            pad=15
-        )
-
+        ax.set_title(title, fontsize=14, pad=15)
         ax.set_xlabel("Lipids")
         ax.set_ylabel("Clinical markers")
-
         ax.tick_params(axis="x", rotation=90)
         ax.tick_params(axis="y", rotation=0)
 
+        return fig, ax
+
+    def save_figure(self, fig, file_name, output_dir):
+        """Save figure as high-resolution PNG and close it."""
         fig.tight_layout()
-
-        safe_treatment = re.sub(
-            r"[^A-Za-z0-9_.-]+",
-            "_",
-            treatment
-        )
-
-        output_file = (
-            heatmap_output_dir
-            / f"{safe_treatment}_correlation_heatmap.png"
-        )
-
-        fig.savefig(
-            output_file,
-            dpi=300,
-            bbox_inches="tight"
-        )
-
+        output_file = os.path.join(output_dir, file_name)
+        fig.savefig(output_file, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        print(f"Saved: {file_name}")
+        return output_file
 
-        print(f"Saved: {output_file.name}")
+    def safe_file_name(self, name):
+        return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
 
+    def plot_heatmaps(self, corr_df, corr_filtered):
+        """Per treatment: a strong-only heatmap and a full-matrix heatmap."""
+        sns.set_theme(style="white")
+        grey_center_cmap = self.build_grey_center_cmap()
 
-    # ========================================================
-    # 8B. NEW FULL CORRELATION HEATMAP
-    #     All correlation values
-    # ========================================================
+        for treatment in self.treatment_order:
+            safe_treatment = self.safe_file_name(treatment)
 
-    full_treatment_df = corr_df[
-        corr_df["treatment"] == treatment
-    ].copy()
+            # Strong correlations only (|r| > threshold)
+            strong_df = corr_filtered[corr_filtered["treatment"] == treatment]
+            if not strong_df.empty:
+                matrix = self.build_heatmap_matrix(strong_df)
+                fig, _ = self.draw_heatmap(
+                    matrix,
+                    title=f"{treatment}\nStrong lipid-clinical correlations",
+                    cmap="RdBu_r",
+                    annot=True,
+                    fmt=".2f"
+                )
+                self.save_figure(fig, f"{safe_treatment}_correlation_heatmap.png", self.heatmap_output_path)
 
-    full_treatment_df = full_treatment_df.dropna(
-        subset=["clinic_marker", "lipid", "r"]
-    )
+            # Full matrix, numbers shown only for |r| > threshold
+            full_df = corr_df[corr_df["treatment"] == treatment].dropna(
+                subset=["clinic_marker", "lipid", "r"]
+            )
+            if full_df.empty:
+                print(f"No correlation data available for {treatment}")
+                continue
 
-    if full_treatment_df.empty:
+            full_matrix = self.build_heatmap_matrix(full_df)
+            fig, _ = self.draw_heatmap(
+                full_matrix,
+                title=f"{treatment}\nFull correlation matrix",
+                cmap=grey_center_cmap,
+                annot=self.build_annotation_matrix(full_matrix),
+                fmt=""
+            )
+            self.save_figure(fig, f"figure_all_{safe_treatment}_correlation_heatmap.png", self.heatmap_output_path)
 
-        print(
-            f"No correlation data available for {treatment}"
+    def run(self):
+        # Step 0: Load correlation results (from Corelation module) and source data for column names
+        corr_df = self.extract_csv("repeat_measures_corelation_clinic_results.csv")
+        clinic_before = self.extract_csv("clinic_before.csv")
+        lipid_raw = self.extract_csv("cleaned_synch_truth_treatmentgroup.csv")
+        print(f"Loaded {len(corr_df)} correlation results")
+
+        # Step 1: Split correlation titles into clinical marker and lipid
+        title_mapping = self.build_title_mapping(
+            self.get_clinic_columns(clinic_before),
+            self.get_lipid_columns(lipid_raw)
         )
+        corr_df = self.match_titles(corr_df, title_mapping)
 
-        continue
+        # Step 2: Filter strong correlations and save
+        corr_filtered = self.filter_strong_correlations(corr_df)
+        filtered_file = self.load_csv(
+            os.path.join("correlation_heatmaps", "strong_correlations.csv"), corr_filtered
+        )
+        print(f"\nTotal correlations: {len(corr_df)}")
+        print(f"Strong correlations: {len(corr_filtered)}")
+        print(f"Filtered results saved: {filtered_file}")
 
+        # Step 3: Heatmaps per treatment
+        self.plot_heatmaps(corr_df, corr_filtered)
 
-    # --------------------------------------------------------
-    # Create full correlation matrix
-    # --------------------------------------------------------
-
-    full_heatmap_data = full_treatment_df.pivot(
-        index="clinic_marker",
-        columns="lipid",
-        values="r"
-    )
-
-    full_heatmap_data = full_heatmap_data.sort_index()
-
-    full_heatmap_data = full_heatmap_data.reindex(
-        sorted(full_heatmap_data.columns),
-        axis=1
-    )
+        print("\nCorrelation heatmaps completed!")
+        print(f"Results saved in: {self.heatmap_output_path}")
 
 
-    # --------------------------------------------------------
-    # Annotation matrix:
-    # Only show numbers where |r| > 0.6
-    # --------------------------------------------------------
-
-    annotation_data = full_heatmap_data.copy().astype(object)
-
-    for row in annotation_data.index:
-
-        for col in annotation_data.columns:
-
-            value = full_heatmap_data.loc[row, col]
-
-            if pd.isna(value):
-
-                annotation_data.loc[row, col] = ""
-
-            elif abs(value) > 0.6:
-
-                annotation_data.loc[row, col] = f"{value:.2f}"
-
-            else:
-
-                annotation_data.loc[row, col] = ""
-
-
-    # --------------------------------------------------------
-    # Figure size
-    # --------------------------------------------------------
-
-    fig_width = max(
-        10,
-        full_heatmap_data.shape[1] * 0.5
-    )
-
-    fig_height = max(
-        6,
-        full_heatmap_data.shape[0] * 0.5
-    )
-
-    fig, ax = plt.subplots(
-        figsize=(fig_width, fig_height)
-    )
-
-
-    # --------------------------------------------------------
-    # Full heatmap
-    # --------------------------------------------------------
-
-    sns.heatmap(
-        full_heatmap_data,
-
-        cmap=custom_cmap,
-        vmin=-1,
-        vmax=1,
-        center=0,
-
-        annot=annotation_data,
-        fmt="",
-
-        linewidths=0.5,
-        linecolor="white",
-
-        mask=full_heatmap_data.isna(),
-
-        cbar_kws={
-            "label": "Repeated-measures correlation (r)"
-        },
-
-        ax=ax
-    )
-
-
-    # --------------------------------------------------------
-    # Labels
-    # --------------------------------------------------------
-
-    ax.set_title(
-        f"{treatment}\nFull correlation matrix",
-        fontsize=14,
-        pad=15
-    )
-
-    ax.set_xlabel("Lipids")
-    ax.set_ylabel("Clinical markers")
-
-    ax.tick_params(
-        axis="x",
-        rotation=90
-    )
-
-    ax.tick_params(
-        axis="y",
-        rotation=0
-    )
-
-
-    fig.tight_layout()
-
-
-    # --------------------------------------------------------
-    # Save new figure
-    # --------------------------------------------------------
-
-    safe_treatment = re.sub(
-        r"[^A-Za-z0-9_.-]+",
-        "_",
-        treatment
-    )
-
-    output_file = (
-        heatmap_output_dir
-        / f"figure_all_{safe_treatment}_correlation_heatmap.png"
-    )
-
-    fig.savefig(
-        output_file,
-        dpi=300,
-        bbox_inches="tight"
-    )
-
-    plt.close(fig)
-
-    print(f"Saved: {output_file.name}")
-
-
-# ============================================================
-# 9. FINISH
-# ============================================================
-
-print("\nCorrelation heatmaps completed!")
-
-print(
-    f"Results saved in: {heatmap_output_dir}"
-)
+if __name__ == "__main__":
+    CorrelationHeatmap().run()

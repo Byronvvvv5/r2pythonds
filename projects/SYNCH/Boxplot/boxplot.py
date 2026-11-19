@@ -1,317 +1,78 @@
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
+import os
 import re
-
-# ============================================================
-# 1. Define folder paths
-# ============================================================
-
-# Folder where this script.py is located
-base_dir = Path(__file__).resolve().parent
-
-# Input and output folders
-input_dir = base_dir / "input"
-output_dir = base_dir / "output"
-
-# Create output folder automatically if it does not exist
-output_dir.mkdir(parents=True, exist_ok=True)
-
-# Input files
-data_file = input_dir / "cleaned_synch_truth_treatmentgroup.csv"
-test_file = input_dir / "paired_t_test_results_sig_withoutresponder.csv"
-
-
-# ============================================================
-# 2. Read datasets
-# ============================================================
-
-data = pd.read_csv(data_file)
-tests = pd.read_csv(test_file)
-
-# Extract lipid names from paired t-test results
-lipid_list = tests["Lipid"].dropna().unique().tolist()
-
-group_order = ["placebo", "Synbiotics", "Synbiotics + FMT"]
-time_order = ["Before", "After"]
-
-
-# ============================================================
-# 3. Function to add P-value annotation
-# ============================================================
-
-def add_p_bracket(ax, x_center, y, h, p):
-
-    ax.plot(
-        [x_center - 0.18, x_center - 0.18,
-         x_center + 0.18, x_center + 0.18],
-        [y, y + h, y + h, y],
-        lw=1.1,
-        c="black",
-        clip_on=False
-    )
-
-    ax.text(
-        x_center,
-        y + h,
-        f"p = {p:.3g}",
-        ha="center",
-        va="bottom",
-        fontsize=9
-    )
-
-
-# ============================================================
-# 4. Draw one boxplot for each lipid
-# ============================================================
-
-for lipid in lipid_list:
-
-    # Check whether lipid exists in dataset 1
-    if lipid not in data.columns:
-        print(f"Skipping {lipid}: column not found")
-        continue
-
-    # Only include treatment groups present in the dataset
-    groups_present = [
-        g for g in group_order
-        if g in data["treatment_group"].unique()
-    ]
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    # Boxplots: Before and After within each treatment group
-    sns.boxplot(
-        data=data,
-        x="treatment_group",
-        y=lipid,
-        hue="Time",
-        order=groups_present,
-        hue_order=time_order,
-        width=0.65,
-        ax=ax
-    )
-
-    # Overlay individual observations
-    sns.stripplot(
-        data=data,
-        x="treatment_group",
-        y=lipid,
-        hue="Time",
-        order=groups_present,
-        hue_order=time_order,
-        dodge=True,
-        alpha=0.35,
-        size=3,
-        ax=ax,
-        color="black"
-    )
-
-    # Remove duplicate legend entries
-    handles, labels = ax.get_legend_handles_labels()
-
-    if handles:
-        unique = dict(zip(labels, handles))
-        ax.legend(
-            unique.values(),
-            unique.keys(),
-            title="Time",
-            loc="best"
-        )
-
-    # Labels and title
-    ax.set_title(lipid)
-    ax.set_xlabel("Treatment group")
-    ax.set_ylabel(lipid)
-    ax.tick_params(axis="x", rotation=15)
-
-    # ========================================================
-    # Add P-values for this lipid and treatment group
-    # ========================================================
-
-    lipid_tests = tests[tests["Lipid"] == lipid]
-
-    group_positions = {
-        g: i for i, g in enumerate(groups_present)
-    }
-
-    for _, row in lipid_tests.iterrows():
-
-        group = row["Group"]
-        p = row["P_Value"]
-
-        # Skip if group or P-value is unavailable
-        if group not in group_positions or pd.isna(p):
-            continue
-
-        group_data = data.loc[
-            data["treatment_group"] == group,
-            lipid
-        ].dropna()
-
-        if group_data.empty:
-            continue
-
-        y_max = group_data.max()
-        y_min = group_data.min()
-
-        span = max(
-            y_max - y_min,
-            abs(y_max) * 0.05,
-            1e-6
-        )
-
-        y = y_max + span * 0.12
-
-        add_p_bracket(
-            ax,
-            group_positions[group],
-            y,
-            span * 0.04,
-            p
-        )
-
-    # Allow space for annotations
-    ax.margins(y=0.18)
-
-    fig.tight_layout()
-
-    # ========================================================
-    # Save figure into output folder
-    # ========================================================
-
-    safe_name = re.sub(
-        r"[^A-Za-z0-9_.-]+",
-        "_",
-        lipid
-    )
-
-    output_file = output_dir / f"{safe_name}.png"
-
-    fig.savefig(
-        output_file,
-        dpi=300,
-        bbox_inches="tight"
-    )
-
-    plt.close(fig)
-
-    print(f"Saved: {output_file.name}")
-
-
-# ============================================================
-# 5. Finished
-# ============================================================
-
-print("\nAll plots have been generated successfully!")
-print(f"Plots saved in: {output_dir}")
-
-
-# ============================================================
-# 6. RESPONDER / NON-RESPONDER ANALYSIS
-# ============================================================
-
-print("\nStarting responder/non-responder analysis...")
-
-# ---- Define input files and output folder ----
-
-responder_data_file = input_dir / "cleaned_paired_ttest_treatmentgroup.csv"
-responder_test_file = input_dir / "paired_t_test_results_sig.csv"
-
-responder_output_dir = output_dir / "responder"
-responder_output_dir.mkdir(parents=True, exist_ok=True)
-
-
-# ---- Read datasets ----
-
-responder_data = pd.read_csv(responder_data_file)
-responder_tests = pd.read_csv(responder_test_file)
-
-
-# ---- Extract lipid names from paired test results ----
-
-responder_lipid_list = (
-    responder_tests["Lipid"]
-    .dropna()
-    .unique()
-    .tolist()
-)
-
-
-# ---- Define treatment group and time order ----
-
-group_order = ["placebo", "Synbiotics", "Synbiotics + FMT"]
-time_order = ["Before", "After"]
-
-# Both responder statuses
-responder_statuses = {
-    "Yes": "Responder",
-    "No": "Non-responder"
-}
-
-
-# ---- Draw plots for each lipid and responder status ----
-
-for lipid in responder_lipid_list:
-
-    if lipid not in responder_data.columns:
-        print(f"Skipping {lipid}: column not found")
-        continue
-
-    # --------------------------------------------------------
-    # Loop over Responder and Non-responder
-    # --------------------------------------------------------
-
-    for status_prefix, status_label in responder_statuses.items():
-
-        # Select data for this status only
-        status_data = responder_data[
-            responder_data["Group"]
-            .astype(str)
-            .str.startswith(f"{status_prefix}-", na=False)
+import sys
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
+# This tells Python where the root directory of your project is
+basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(basedir)
+from DataProcessor.ProcessorClass import ProcessorClass
+
+
+class Boxplot(ProcessorClass):
+    """Boxplots (Before/After per treatment group) for lipids with paired t-test p-values."""
+
+    def __init__(self):
+        super().__init__(__file__)
+        self.responder_output_path = os.path.join(self.output_path, "responder")
+        os.makedirs(self.responder_output_path, exist_ok=True)
+
+        self.group_order = ["placebo", "Synbiotics", "Synbiotics + FMT"]
+        self.time_order = ["Before", "After"]
+        self.responder_statuses = {
+            "Yes": "Responder",
+            "No": "Non-responder"
+        }
+
+    def get_lipid_list(self, tests):
+        """Extract unique lipid names from paired t-test results."""
+        return tests["Lipid"].dropna().unique().tolist()
+
+    def get_groups_present(self, df):
+        """Treatment groups in plotting order, limited to those present in the data."""
+        return [g for g in self.group_order if g in df["treatment_group"].unique()]
+
+    def filter_responder_status(self, df, status_prefix):
+        """Keep rows whose Group starts with e.g. 'Yes-' or 'No-'."""
+        return df[
+            df["Group"].astype(str).str.startswith(f"{status_prefix}-", na=False)
         ].copy()
 
-        if status_data.empty:
-            print(f"Skipping {lipid} ({status_label}): no data")
-            continue
+    def add_p_bracket(self, ax, x_center, y, h, p):
+        """Draw a bracket with the p-value above one treatment group."""
+        ax.plot(
+            [x_center - 0.18, x_center - 0.18, x_center + 0.18, x_center + 0.18],
+            [y, y + h, y + h, y],
+            lw=1.1,
+            c="black",
+            clip_on=False
+        )
+        ax.text(x_center, y + h, f"p = {p:.3g}", ha="center", va="bottom", fontsize=9)
 
-        # Determine treatment groups present
-        groups_present = [
-            g for g in group_order
-            if g in status_data["treatment_group"].unique()
-        ]
-
-        if not groups_present:
-            continue
-
-        # ----------------------------------------------------
-        # Create figure
-        # ----------------------------------------------------
-
+    def draw_boxplot(self, df, lipid, groups_present, title):
+        """Draw boxplot + individual observations for one lipid. Returns fig, ax."""
         fig, ax = plt.subplots(figsize=(8, 5))
 
-        # Boxplots
         sns.boxplot(
-            data=status_data,
+            data=df,
             x="treatment_group",
             y=lipid,
             hue="Time",
             order=groups_present,
-            hue_order=time_order,
+            hue_order=self.time_order,
             width=0.65,
             ax=ax
         )
-
-        # Individual observations
         sns.stripplot(
-            data=status_data,
+            data=df,
             x="treatment_group",
             y=lipid,
             hue="Time",
             order=groups_present,
-            hue_order=time_order,
+            hue_order=self.time_order,
             dodge=True,
             alpha=0.35,
             size=3,
@@ -319,121 +80,127 @@ for lipid in responder_lipid_list:
             ax=ax
         )
 
-        # ----------------------------------------------------
-        # Remove duplicate legend entries
-        # ----------------------------------------------------
-
+        # Boxplot and stripplot both add legend entries; keep one per label
         handles, labels = ax.get_legend_handles_labels()
-
         if handles:
             unique = dict(zip(labels, handles))
-            ax.legend(
-                unique.values(),
-                unique.keys(),
-                title="Time",
-                loc="best"
-            )
+            ax.legend(unique.values(), unique.keys(), title="Time", loc="best")
 
-        # ----------------------------------------------------
-        # Labels and title
-        # ----------------------------------------------------
-
-        ax.set_title(f"{lipid} ({status_label})")
+        ax.set_title(title)
         ax.set_xlabel("Treatment group")
         ax.set_ylabel(lipid)
         ax.tick_params(axis="x", rotation=15)
 
-        # ----------------------------------------------------
-        # Add P-values
-        # ----------------------------------------------------
+        return fig, ax
 
-        lipid_tests = responder_tests[
-            responder_tests["Lipid"] == lipid
-        ]
+    def annotate_p_values(self, ax, df, lipid, lipid_tests, groups_present, status_prefix=None):
+        """
+        Add p-value brackets for each tested treatment group.
 
-        group_positions = {
-            g: i for i, g in enumerate(groups_present)
-        }
+        If status_prefix is given (e.g. 'Yes'), only tests with Group 'Yes-<treatment>'
+        are used and the prefix is stripped to match the plotted treatment group.
+        """
+        group_positions = {g: i for i, g in enumerate(groups_present)}
 
         for _, row in lipid_tests.iterrows():
-
-            test_group = str(row["Group"])
+            group = row["Group"]
             p = row["P_Value"]
 
             if pd.isna(p):
                 continue
 
-            # Only use test results matching this status
-            if not test_group.startswith(f"{status_prefix}-"):
+            if status_prefix is not None:
+                group = str(group)
+                if not group.startswith(f"{status_prefix}-"):
+                    continue
+                group = group.replace(f"{status_prefix}-", "", 1)
+
+            if group not in group_positions:
                 continue
 
-            # Convert test group to plotting group
-            # Example: Yes-Synbiotics -> Synbiotics
-            plotting_group = test_group.replace(
-                f"{status_prefix}-",
-                "",
-                1
-            )
-
-            if plotting_group not in group_positions:
-                continue
-
-            # Data for the corresponding treatment group
-            group_data = status_data.loc[
-                status_data["treatment_group"] == plotting_group,
-                lipid
-            ].dropna()
-
+            group_data = df.loc[df["treatment_group"] == group, lipid].dropna()
             if group_data.empty:
                 continue
 
             y_max = group_data.max()
             y_min = group_data.min()
+            span = max(y_max - y_min, abs(y_max) * 0.05, 1e-6)
 
-            span = max(
-                y_max - y_min,
-                abs(y_max) * 0.05,
-                1e-6
-            )
+            self.add_p_bracket(ax, group_positions[group], y_max + span * 0.12, span * 0.04, p)
 
-            y = y_max + span * 0.12
-
-            # Add p-value bracket
-            add_p_bracket(
-                ax,
-                group_positions[plotting_group],
-                y,
-                span * 0.04,
-                p
-            )
-
-        # ----------------------------------------------------
-        # Save plot
-        # ----------------------------------------------------
-
+        # Allow space for annotations
         ax.margins(y=0.18)
+
+    def save_figure(self, fig, file_name, output_dir):
+        """Save figure as high-resolution PNG and close it."""
         fig.tight_layout()
-
-        safe_name = re.sub(
-            r"[^A-Za-z0-9_.-]+",
-            "_",
-            lipid
-        )
-
-        output_file = responder_output_dir / (
-            f"{safe_name}_{status_label.replace(' ', '_')}.png"
-        )
-
-        fig.savefig(
-            output_file,
-            dpi=300,
-            bbox_inches="tight"
-        )
-
+        output_file = os.path.join(output_dir, file_name)
+        fig.savefig(output_file, dpi=300, bbox_inches="tight")
         plt.close(fig)
+        print(f"Saved: {file_name}")
+        return output_file
 
-        print(f"Saved: {output_file.name}")
+    def safe_file_name(self, name):
+        return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+
+    def plot_treatment_boxplots(self, data, tests):
+        """One boxplot per significant lipid, all subjects."""
+        groups_present = self.get_groups_present(data)
+
+        for lipid in self.get_lipid_list(tests):
+            if lipid not in data.columns:
+                print(f"Skipping {lipid}: column not found")
+                continue
+
+            fig, ax = self.draw_boxplot(data, lipid, groups_present, title=lipid)
+            lipid_tests = tests[tests["Lipid"] == lipid]
+            self.annotate_p_values(ax, data, lipid, lipid_tests, groups_present)
+
+            self.save_figure(fig, f"{self.safe_file_name(lipid)}.png", self.output_path)
+
+    def plot_responder_boxplots(self, data, tests):
+        """One boxplot per significant lipid and responder status."""
+        for lipid in self.get_lipid_list(tests):
+            if lipid not in data.columns:
+                print(f"Skipping {lipid}: column not found")
+                continue
+
+            lipid_tests = tests[tests["Lipid"] == lipid]
+
+            for status_prefix, status_label in self.responder_statuses.items():
+                status_data = self.filter_responder_status(data, status_prefix)
+                if status_data.empty:
+                    print(f"Skipping {lipid} ({status_label}): no data")
+                    continue
+
+                groups_present = self.get_groups_present(status_data)
+                if not groups_present:
+                    continue
+
+                fig, ax = self.draw_boxplot(
+                    status_data, lipid, groups_present, title=f"{lipid} ({status_label})"
+                )
+                self.annotate_p_values(
+                    ax, status_data, lipid, lipid_tests, groups_present, status_prefix=status_prefix
+                )
+
+                file_name = f"{self.safe_file_name(lipid)}_{status_label.replace(' ', '_')}.png"
+                self.save_figure(fig, file_name, self.responder_output_path)
+
+    def run(self):
+        # Step 1: Boxplots for all subjects, with paired t-test p-values
+        data = self.extract_csv("cleaned_synch_truth_treatmentgroup.csv")
+        tests = self.extract_csv("paired_t_test_results_sig_withoutresponder.csv")
+        self.plot_treatment_boxplots(data, tests)
+        print(f"\nAll plots have been generated successfully!\nPlots saved in: {self.output_path}")
+
+        # Step 2: Boxplots split by responder / non-responder
+        print("\nStarting responder/non-responder analysis...")
+        responder_data = self.extract_csv("cleaned_paired_ttest_treatmentgroup.csv")
+        responder_tests = self.extract_csv("paired_t_test_results_sig.csv")
+        self.plot_responder_boxplots(responder_data, responder_tests)
+        print(f"\nResponder/non-responder plots completed!\nPlots saved in: {self.responder_output_path}")
 
 
-print("\nResponder/non-responder plots completed!")
-print(f"Plots saved in: {responder_output_dir}")
+if __name__ == "__main__":
+    Boxplot().run()

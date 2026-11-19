@@ -25,7 +25,7 @@ class Corelation(ProcessorClass):
 
         return pd.DataFrame(
             {
-                "title": [col_1] - [col_2],
+                "title": f"{col_1} - {col_2}",
                 "r": [r],
                 "p": [p],
                 "r2": [r2]
@@ -66,7 +66,7 @@ class Corelation(ProcessorClass):
         FMT_subset = df.copy()
         FMT_df = FMT_subset[FMT_subset["treatment_group"] == "Synbiotics + FMT"].iloc[:, 2:]
         placebo_subset = df.copy()
-        placebo_df = placebo_subset[placebo_subset["treatment_group"] == "Synbiotics"].iloc[:, 2:]
+        placebo_df = placebo_subset[placebo_subset["treatment_group"] == "placebo"].iloc[:, 2:]
 
         return synch_df, FMT_df, placebo_df
 

@@ -1,3 +1,3 @@
-from Corelation import Corelation
+from .Corelation import Corelation
 
 __all__ = ['Corelation']

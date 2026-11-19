@@ -1,3 +1,3 @@
-from PCA import PCAPrcomp
+from .PCA import PCAPrcomp
 
 __all__ = ['PCAPrcomp']
