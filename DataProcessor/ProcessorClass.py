@@ -31,7 +31,7 @@ class ProcessorClass:
         full_path = os.path.join(self.input_path, file_name)
         return pd.read_csv(full_path, **kwargs)
     
-    def extract_txt(self, file_name, **kwargs):
+    def extract_txt(self, file_name, sep="\t", **kwargs):
         """
         Encoding should be provided in kwargs if the text file is not in UTF-8.
         e.g.:utf-8
@@ -40,7 +40,7 @@ class ProcessorClass:
             latin1
         """
         full_path = os.path.join(self.input_path, file_name)
-        return pd.read_csv(full_path, sep="\t", **kwargs)
+        return pd.read_csv(full_path, sep=sep, **kwargs)
 
     def load_csv(self, file_name, df, **kwargs):
         """For both comma-separated and semicolon-separated CSV files."""

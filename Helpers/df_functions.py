@@ -3,6 +3,11 @@ import numpy as np
 import warnings
 from typing import Union, List
 
+def move_column(df, col_name, new_position):
+    cols = df.columns.tolist()
+    cols.insert(new_position, cols.pop(cols.index(col_name)))
+    return df[cols]
+
 def enforce_schema(df, schema_class):
     """Ensure the DataFrame matches the given schema."""
     schema_fields = schema_class.__annotations__  # Get field names and types from the dataclass

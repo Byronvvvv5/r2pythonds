@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.patches import Ellipse
 
-def pca_plot_pc1_pc2(pca, scores, df, output_path, ellipse_identity: str = 'Group', highlight_identity: str = 'SampleID'):
+def pca_plot_pc1_pc2(pca, scores, df, output_path, ellipse_identity: str = 'Group', highlight_identity: str = 'SampleID', extra_confounder: str = None):
     """Create a PCA plot."""
     # Variance explained
     variance_explained = pca.explained_variance_ratio_
@@ -27,7 +27,23 @@ def pca_plot_pc1_pc2(pca, scores, df, output_path, ellipse_identity: str = 'Grou
 
     # Plot PC1 vs PC2 with improvements
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(data=scores_df, x='PC1', y='PC2', hue='ellipse_identity', style='ellipse_identity', s=100, edgecolor='black')
+    scatter_args = {
+        'data': scores_df,
+        'x': 'PC1',
+        'y':'PC2',
+        'style': 'ellipse_identity',
+        's': 100,
+        'edgecolor': 'black',
+    }
+
+    if extra_confounder is not None:
+        scores_df['extra_confounder'] = df[extra_confounder].to_numpy()
+        scatter_args['hue'] = 'extra_confounder'
+        scatter_args['palette'] = 'RdBu_r' #blue/green-viridis; blue/red-RdBu_r; blue/orange-coolwarm
+    else:
+        scatter_args['color'] = 'steelblue'
+
+    sns.scatterplot(**scatter_args)
 
     # Add confidence ellipses for each group
     for group, data in scores_df.groupby('ellipse_identity'):
@@ -38,8 +54,8 @@ def pca_plot_pc1_pc2(pca, scores, df, output_path, ellipse_identity: str = 'Grou
         plt.gca().add_patch(ellipse)
 
     # Highlight highest PC1 and lowest PC2 points
-    plt.scatter(highest_PC1['PC1'], highest_PC1['PC2'], color='red', label='Highest PC1', edgecolor='black', zorder=5)
-    plt.scatter(highest_PC2['PC1'], highest_PC2['PC2'], color='blue', label='Lowest PC2', edgecolor='black', zorder=5)
+    # plt.scatter(highest_PC1['PC1'], highest_PC1['PC2'], color='red', label='Highest PC1', edgecolor='black', zorder=5)
+    # plt.scatter(highest_PC2['PC1'], highest_PC2['PC2'], color='blue', label='Lowest PC2', edgecolor='black', zorder=5)
 
     # Add labels using the highlight_identity values
     plt.annotate(
@@ -70,7 +86,7 @@ def pca_plot_pc1_pc2(pca, scores, df, output_path, ellipse_identity: str = 'Grou
     plt.axhline(0, color='gray', linestyle='--', linewidth=0.8)
     plt.grid(True)
     plt.subplots_adjust(right=0.78)
-    plt.legend(title= ellipse_identity, loc='upper left', bbox_to_anchor=(1.02, 0.5))
+    plt.legend(loc='upper left', bbox_to_anchor=(1.02, 0.5))
     plt.tight_layout()
     sns.set_style("white")
     

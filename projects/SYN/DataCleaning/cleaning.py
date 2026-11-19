@@ -70,9 +70,9 @@ class Cleaning(ProcessorClass):
             df_final = df_sample.merge(df_test, on='injectionID', how='left')
         else:
             df_final = df_test.merge(df_sample, on='injectionID', how='left')
-        
-        self.load_csv('merged_DataCleaning_output.csv', df_final)
-        self.copy_output_file('merged_DataCleaning_output.csv', self.output_copy_path)
+        print(df_final)
+        # self.load_csv('merged_DataCleaning_output.csv', df_final)
+        # self.copy_output_file('merged_DataCleaning_output.csv', self.output_copy_path)
 
         return df_final
 
